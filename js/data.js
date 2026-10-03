@@ -19,45 +19,6 @@ export const ZOOS = [
   { id: 'ZOO-BER-04', name: 'Riverside Zoological Park' }
 ];
 
-export const ZOO_OBSERVATIONS = [
-  {
-    keeper_id: '1',
-    zoo_id: 'Z001',
-    animal_name: 'Elephant',
-    behaviour: 'Repeated pacing and unusual vocalization',
-    intensity: 8,
-    animal_percentage: 72,
-    duration: 18
-  },
-  {
-    keeper_id: '1',
-    zoo_id: 'Z001',
-    animal_name: 'Giraffe',
-    behaviour: 'Repeated directional movement and agitation',
-    intensity: 6,
-    animal_percentage: 68,
-    duration: 12
-  },
-  {
-    keeper_id: '1',
-    zoo_id: 'Z001',
-    animal_name: 'Crocodile',
-    behaviour: 'Thrashing water and sudden bellowing',
-    intensity: 8,
-    animal_percentage: 64,
-    duration: 22
-  },
-  {
-    keeper_id: '1',
-    zoo_id: 'Z001',
-    animal_name: 'Snake',
-    behaviour: 'Crawling out in broad daylight',
-    intensity: 6,
-    animal_percentage: 38,
-    duration: 9
-  }
-];
-
 export const ZOO_ALERTS = [
   {
     animal: 'Giraffe',
@@ -175,17 +136,7 @@ export async function getObservations() {
   return fetchObservations();
 }
 
-export async function submitObservation(data) {
-  const payload = {
-    keeper_id: data.keeper_id || data.keeperId || 'K001',
-    zoo_id: data.zoo_id || data.zooId || 'Z001',
-    animal_name: data.animal_name || data.animal || 'Unknown',
-    behaviour: data.behaviour || data.observedBehaviour || 'No behaviour recorded',
-    intensity: asNumber(data.intensity || data.observationIntensity || 5, 5),
-    animal_percentage: asNumber(data.animal_percentage || data.abnormalityPercentage || 0, 0),
-    duration: asNumber(data.duration || data.durationMinutes || 0, 0)
-  };
-
+export async function submitObservation(payload) {
   try {
     return await createObservation(payload);
   } catch (error) {
@@ -270,10 +221,6 @@ export async function registerCitizen(payload) {
 
 export async function loginAdmin(payload) {
   return adminLogin(payload);
-}
-
-export function getZooObservations() {
-  return [...ZOO_OBSERVATIONS];
 }
 
 export function getZooAlerts() {

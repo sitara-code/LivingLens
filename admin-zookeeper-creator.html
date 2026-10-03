@@ -152,7 +152,7 @@
     <script type="module">
       import { requireRole, getCurrentUser } from './js/auth.js';
       import { setupFormValidation, showError } from './js/forms.js';
-      import { getZooKeepers, addZooKeeper, getZooObservations, getZooAlerts } from './js/data.js';
+      import { getObservations, getZooKeepers, addZooKeeper, getZooAlerts } from './js/data.js';
       import './js/nav.js';
 
       if (requireRole('admin')) {
@@ -169,19 +169,33 @@
         const observationGrid = document.getElementById('zoo-observations-grid');
         const alertGrid = document.getElementById('zoo-alerts-grid');
 
-        function renderZooObservations() {
-          const observations = getZooObservations();
-          observationGrid.innerHTML = observations.map((obs) => `
-            <div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 8px; min-height: 170px;">
-              <p><strong>Animal:</strong> ${obs.animal_name}</p>
-              <p><strong>Observed Behaviour:</strong> ${obs.behaviour}</p>
-              <p><strong>Abnormality Percentage:</strong> ${obs.animal_percentage}%</p>
-              <p><strong>Duration:</strong> ${obs.duration} minutes</p>
-              <p><strong>Observation Intensity:</strong> ${obs.intensity}</p>
-              <p><strong>Keeper ID:</strong> ${obs.keeper_id}</p>
-              <p><strong>Zoo ID:</strong> ${obs.zoo_id}</p>
-            </div>
-          `).join('');
+        async function renderZooObservations() {
+          observationGrid.innerHTML = '<p>Loading current observations...</p>';
+
+          try {
+            const observations = await getObservations();
+
+            if (!observations.length) {
+              observationGrid.innerHTML = '<p>No observations found.</p>';
+              return;
+            }
+
+            observationGrid.innerHTML = observations.map((obs) => `
+              <div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 8px; min-height: 170px;">
+                <p><strong>Animal:</strong> ${obs.animal}</p>
+                <p><strong>Observed Behaviour:</strong> ${obs.observedBehaviour}</p>
+                <p><strong>Abnormality Percentage:</strong> ${obs.abnormalityPercentage}%</p>
+                <p><strong>Duration:</strong> ${obs.durationMinutes} minutes</p>
+                <p><strong>Observation Intensity:</strong> ${obs.intensity}</p>
+                <p><strong>Keeper ID:</strong> ${obs.keeper_id || 'Not available'}</p>
+                <p><strong>Zoo ID:</strong> ${obs.zoo_id || 'Not available'}</p>
+                <p><strong>Hazard Probability:</strong> ${obs.hazardProbability == null ? 'Not available' : `${Number(obs.hazardProbability).toFixed(2)}%`}</p>
+              </div>
+            `).join('');
+          } catch (error) {
+            console.error('Failed to load current observations:', error);
+            observationGrid.innerHTML = '<p>Unable to load current observations right now.</p>';
+          }
         }
 
         function renderZooAlerts() {
@@ -251,7 +265,7 @@
             successBanner.style.display = 'block';
             form.reset();
             await renderKeepers();
-            renderZooObservations();
+            await renderZooObservations();
             renderZooAlerts();
             window.scrollTo({ top: 0, behavior: 'smooth' });
 

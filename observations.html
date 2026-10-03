@@ -51,7 +51,9 @@
               return;
             }
 
-            container.innerHTML = observations.map(obs => `
+            const observationsWithProbabilities = observations;
+
+            container.innerHTML = observationsWithProbabilities.map(obs => `
               <div class="observation-card">
                 <p><strong>Animal:</strong> ${obs.animal || 'Unknown animal'}</p>
                 <p><strong>Observed Behaviour:</strong></p>
@@ -59,7 +61,7 @@
                 <p><strong>Abnormality Percentage:</strong> ${Number(obs.abnormalityPercentage ?? 0).toFixed(0)}%</p>
                 <p><strong>Intensity:</strong> ${obs.intensity || 'Not provided'}</p>
                 <p><strong>Duration of behaviour (minutes):</strong> ${Number(obs.durationMinutes ?? 0)}</p>
-                <p class="card-hazard" style="margin-top:4px;">Hazard probability: ${Number(obs.hazardProbability ?? 0).toFixed(2)}%</p>
+                <p class="card-hazard" style="margin-top:4px;">Hazard probability: ${obs.hazardProbability == null ? 'Not available' : `${Number(obs.hazardProbability).toFixed(2)}%`}</p>
               </div>
             `).join('');
           } catch (error) {

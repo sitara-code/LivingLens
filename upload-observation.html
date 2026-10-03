@@ -177,6 +177,8 @@
               </div>
             </div>
 
+            <div id="observation-submit-error" class="field-error-msg" role="alert" style="display: none;"></div>
+
             <!-- Form Action Buttons -->
             <div class="form-actions-row">
               <a href="observations.html" class="action-btn" style="background-color: #0ED999;">
@@ -252,9 +254,10 @@
     </main>
 
     <script type="module">
-      import { requireRole, getCurrentUser } from './js/auth.js';
+      import { requireRole, getCurrentUser, saveUser } from './js/auth.js';
       import { setupFormValidation, showError, clearError } from './js/forms.js';
-      import { submitObservation, predictHazard } from './js/data.js';
+      import { predictHazard } from './js/data.js';
+      import { addZooKeeper, getZooKeepers } from './js/api.js';
       import './js/nav.js';
 
       if (requireRole('zookeeper')) {
@@ -295,7 +298,9 @@
         });
 
         const form = document.getElementById('upload-observation-form');
+        const submissionError = document.getElementById('observation-submit-error');
         setupFormValidation(form, async (data) => {
+          submissionError.style.display = 'none';
           const totalAnimals = Number(data.totalAnimals || 0);
           const animalsShowing = Number(data.animalsShowing || 0);
 
@@ -305,41 +310,89 @@
           }
 
           try {
+            if (!user?.zoo_id) {
+              throw new Error('Zoo ID is missing. Please sign in again.');
+            }
+
+            const keeperId = user.keeper_id || `demo-keeper-${Date.now()}`;
+            const keepers = await getZooKeepers(user.zoo_id);
+            const registeredKeeper = keepers.find((keeper) => keeper.keeper_id === keeperId);
+            if (!registeredKeeper) {
+              await addZooKeeper({
+                username: user.username || keeperId,
+                keeper_id: keeperId,
+                zoo_id: user.zoo_id
+              });
+            }
+
+            if (!user.keeper_id) {
+              saveUser({ ...user, keeper_id: keeperId, username: user.username || keeperId });
+            }
+
             const intensityValue = Number((data.intensity || '5 - Moderate').split(' ')[0]);
             const abnormalityPercent = totalAnimals > 0 ? Math.min((animalsShowing / totalAnimals) * 100, 100) : 0;
+            const abnormalityPercentage = Number(abnormalityPercent.toFixed(0));
+            const durationMinutes = Number(data.durationMinutes || 0);
             const hazardResponse = await predictHazard({
+              keeper_id: keeperId,
+              zoo_id: user.zoo_id,
+              animal_name: data.animal,
               animal: data.animal,
               behaviour: data.observedBehaviour,
               intensity: intensityValue,
-              abnormality_percentage: Number(abnormalityPercent.toFixed(0)),
-              duration_minutes: Number(data.durationMinutes || 0)
+              animal_percentage: abnormalityPercentage,
+              abnormality_percentage: abnormalityPercentage,
+              duration: durationMinutes,
+              duration_minutes: durationMinutes,
+              date: new Date().toISOString()
             });
 
             const hazardPct = Number(
               hazardResponse?.hazard_probability ??
               hazardResponse?.hazardProbability ??
               hazardResponse?.probability ??
+              hazardResponse?.prediction ??
               0
             );
 
-            await submitObservation({
-              keeper_id: user?.keeper_id || user?.badgeId || 'K001',
-              zoo_id: user?.zoo_id || user?.zoo || user?.zooId || 'Z001',
-              animal_name: data.animal,
-              behaviour: data.observedBehaviour,
-              intensity: intensityValue,
-              animal_percentage: Number(abnormalityPercent.toFixed(0)),
-              duration: Number(data.durationMinutes || 0)
-            });
-
             const gaugePct = Number.isFinite(hazardPct) ? Math.min(Math.max(hazardPct, 0), 100) : 0;
-            modalRiskGauge.setAttribute('aria-valuenow', String(gaugePct));
-            modalRiskGaugeNeedle.setAttribute('transform', `rotate(${gaugePct * 1.8 - 90} 120 120)`);
-            modalRiskValue.textContent = `${Number.isFinite(hazardPct) ? hazardPct.toFixed(2) : '0.00'}%`;
+            const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            modalRiskGauge.setAttribute('aria-valuenow', '0');
+            modalRiskGaugeNeedle.setAttribute('transform', 'rotate(-90 120 120)');
+            modalRiskValue.textContent = '0.00%';
             modal.classList.add('active');
+
+            if (reducedMotion) {
+              modalRiskGauge.setAttribute('aria-valuenow', String(gaugePct));
+              modalRiskGaugeNeedle.setAttribute('transform', `rotate(${gaugePct * 1.8 - 90} 120 120)`);
+              modalRiskValue.textContent = `${gaugePct.toFixed(2)}%`;
+              return;
+            }
+
+            const animationDuration = 1200;
+            const animationStart = performance.now();
+            function animateGauge(now) {
+              const progress = Math.min((now - animationStart) / animationDuration, 1);
+              const easedProgress = 1 - (1 - progress) ** 3;
+              const displayedPct = gaugePct * easedProgress;
+              modalRiskGauge.setAttribute('aria-valuenow', displayedPct.toFixed(2));
+              modalRiskValue.textContent = `${displayedPct.toFixed(2)}%`;
+
+              if (progress < 1) {
+                requestAnimationFrame(animateGauge);
+              } else {
+                modalRiskGaugeNeedle.setAttribute('transform', `rotate(${gaugePct * 1.8 - 90} 120 120)`);
+              }
+            }
+
+            requestAnimationFrame(() => {
+              modalRiskGaugeNeedle.setAttribute('transform', `rotate(${gaugePct * 1.8 - 90} 120 120)`);
+              requestAnimationFrame(animateGauge);
+            });
           } catch (error) {
             console.error('Observation submission error:', error);
-            showError(document.getElementById('observation-intensity'), error.message || 'Unable to submit observation.');
+            submissionError.textContent = error.message || 'Unable to submit observation.';
+            submissionError.style.display = 'flex';
           }
         });
 

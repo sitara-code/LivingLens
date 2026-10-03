@@ -322,6 +322,16 @@
   stroke-linecap: round;
 }
 
+#hazard-gauge-needle {
+  transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hazard-gauge-needle {
+    transition: none;
+  }
+}
+
 .hazard-gauge-hub-outer {
   fill: var(--color-action-btn);
   stroke: var(--color-card-text);

@@ -2,7 +2,7 @@ const DEFAULT_API_BASE_URL = 'https://zoo-sentinel-server.onrender.com';
 
 export const API_BASE_URL = (() => {
   const envBase = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_BASE_URL : '';
-  const base = (import.meta.env?.DEV ? '/api' : envBase || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+  const base = (import.meta.env?.DEV || import.meta.env?.PROD ? '/api' : envBase || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
   return base || DEFAULT_API_BASE_URL;
 })();
 
@@ -14,6 +14,8 @@ function normalizeErrorMessage(payload, fallback) {
     if (typeof payload.detail === 'string') return payload.detail;
     if (Array.isArray(payload.detail)) {
       const first = payload.detail[0];
+      const field = first?.loc?.[first.loc.length - 1];
+      if (first?.msg === 'Field required' && field) return `${field} is required`;
       return first?.msg || first?.message || fallback;
     }
   }
@@ -66,13 +68,21 @@ function valueOr(...candidates) {
 }
 
 export function normalizeObservation(item = {}) {
-  const hazardProbability = asNumber(
-    valueOr(item.hazard_probability, item.hazardProbability, item.probability, item.hazard_prob, item.risk_score, 0),
-    0
+  const rawHazardProbability = valueOr(
+    item.hazard_probability,
+    item.hazardProbability,
+    item.probability,
+    item.hazard_prob,
+    item.risk_score
   );
+  const hazardProbability = rawHazardProbability === undefined
+    ? null
+    : asNumber(rawHazardProbability, null);
 
   return {
     id: valueOr(item.id, item._id, `obs-${Date.now()}-${Math.random()}`),
+    keeper_id: valueOr(item.keeper_id, item.keeperId),
+    zoo_id: valueOr(item.zoo_id, item.zooId),
     animal: valueOr(item.animal_name, item.animal, item.animalName, 'Unknown animal'),
     observedBehaviour: valueOr(item.behaviour, item.observed_behaviour, item.observedBehaviour, 'No behaviour recorded'),
     abnormalityPercentage: asNumber(

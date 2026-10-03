@@ -23,12 +23,13 @@
           </header>
 
           <div class="panel-body">
+            <p class="auth-header-link">Demo access: passwords are not verified. A missing keeper record is created for the entered Zoo ID.</p>
             <form id="zookeeper-login-form" novalidate>
               <div class="form-group">
-                <label for="zoo-select" class="form-label">Zoo ID</label>
+                <label for="zoo-id" class="form-label">Zoo ID</label>
                 <input
                   type="text"
-                  id="zoo-select"
+                  id="zoo-id"
                   name="zoo_id"
                   class="pill-input"
                   placeholder="Enter your Zoo ID"
@@ -37,25 +38,25 @@
               </div>
 
               <div class="form-group">
-                <label for="keeper-username" class="form-label">Username</label>
+                <label for="keeper-id" class="form-label">Keeper ID</label>
                 <input
                   type="text"
-                  id="keeper-username"
-                  name="username"
+                  id="keeper-id"
+                  name="keeper_id"
                   class="pill-input"
-                  placeholder="Enter your username"
+                  placeholder="Enter your Keeper ID"
                   required
                 />
               </div>
 
               <div class="form-group">
-                <label for="badge-id" class="form-label">Keeper ID</label>
+                <label for="keeper-password" class="form-label">Password</label>
                 <input
-                  type="text"
-                  id="badge-id"
-                  name="keeper_id"
+                  type="password"
+                  id="keeper-password"
+                  name="password"
                   class="pill-input"
-                  placeholder="e.g. ZK-4819"
+                  placeholder="Any password"
                   required
                 />
               </div>
@@ -72,33 +73,38 @@
     <script type="module">
       import { saveUser } from './js/auth.js';
       import { setupFormValidation, showError } from './js/forms.js';
-      import { keeperLogin } from './js/api.js';
+      import { addZooKeeper, getZooKeepers } from './js/api.js';
       import './js/nav.js';
 
       const form = document.getElementById('zookeeper-login-form');
       setupFormValidation(form, async (data) => {
-        try {
-          const payload = {
-            username: data.username,
-            keeper_id: data.keeper_id,
-            zoo_id: data.zoo_id
-          };
+        const zooId = data.zoo_id.trim();
+        const keeperId = data.keeper_id.trim();
 
-          const response = await keeperLogin(payload);
+        try {
+          const keepers = await getZooKeepers(zooId);
+          const keeper = keepers.find((item) => item.keeper_id === keeperId);
+          const verifiedKeeper = keeper || await addZooKeeper({
+            username: keeperId,
+            keeper_id: keeperId,
+            zoo_id: zooId
+          });
 
           saveUser({
             role: 'zookeeper',
-            username: response?.username || payload.username,
-            keeper_id: response?.keeper_id || payload.keeper_id,
-            zoo_id: response?.zoo_id || payload.zoo_id,
-            ...response,
+            username: verifiedKeeper?.username || keeperId,
+            keeper_id: verifiedKeeper?.keeper_id || keeperId,
+            zoo_id: verifiedKeeper?.zoo_id || zooId,
             signedInAt: new Date().toISOString()
           });
 
           window.location.href = 'observations.html';
         } catch (error) {
-          const input = document.getElementById('badge-id');
-          showError(input, error.message || 'Unable to sign in. Please check your credentials.');
+          console.error('Unable to prepare keeper account:', error);
+          showError(
+            document.getElementById('keeper-id'),
+            error.message || 'Unable to register or verify this keeper with the API.'
+          );
         }
       });
     </script>
